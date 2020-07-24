@@ -49,6 +49,8 @@ namespace OpcUaTest
         public int currentCount = 0;
         //定义Timer类
         System.Timers.Timer timer;
+
+        public bool b_keepRunning = false;
         //定义委托
         public delegate void SetControlValue(string value);
         private void Form1_Load(object sender, EventArgs e)
@@ -108,6 +110,25 @@ namespace OpcUaTest
             {
                 MessageBox.Show("执行定时到点事件失败:" + ex.Message);
             }
+        }
+
+        private void UpdateData()
+        {
+            while (b_keepRunning)
+            {
+                try
+                {
+                    //double now_OADate = DateTime.Now.ToOADate();
+                    short value = m_OpcUaClient.ReadNode<short>("ns=2;s=|var|CPX-CEC-S1-V3.Application.Valve1_FBs.SetValue2");
+                    double now_OADate = DateTime.Now.ToOADate();
+
+                    listp.Add(new point_XY(now_OADate, value));
+                }
+                catch (Exception)
+                {
+                }
+            }
+            //UpdateData();
         }
 
         /// <summary>
@@ -228,6 +249,8 @@ namespace OpcUaTest
 
         private void button2_Click(object sender, EventArgs e)
         {
+            listp.Clear();
+            chart1.Series[0].Points.Clear();
             if (!m_OpcUaClient.Connected)
             {
                 button1_Click(sender, e);
@@ -236,27 +259,40 @@ namespace OpcUaTest
             {
                 Thread.Sleep(10);
             }
+            b_keepRunning = true;
+            ThreadStart start = delegate
+            {
+                UpdateData();
+            };
+            Thread tStart = new Thread(start);
+            tStart.Priority= ThreadPriority.Highest;
+            tStart.IsBackground = true;
+            tStart.Start();
+            timer1.Enabled = true;
             //start
-            timer.Enabled = true;
-            timer.Start();
+            ////timer.Enabled = true;
+            ////timer.Start();
             //chart1.DataSource = listp;
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
             //stop
-            timer.Stop();
+            //timer.Stop();
+
             //chart1.DataSource = listp;
             //chart1.DataBind();
-            int mmm = 0;
-            if (listp.Count - 100 > 0)
-            {
-                mmm = listp.Count - 100;
-            }
-            for (int i = mmm; i < listp.Count; i++)
-            {
-                chart1.Series[0].Points.AddXY(Convert.ToDouble(listp[i].mOADate), Convert.ToDouble(listp[i].Value));
-            }
+
+            b_keepRunning = false;
+            //int mmm = 0;
+            //if (listp.Count - 1000 > 0)
+            //{
+            //    mmm = listp.Count - 1000;
+            //}
+            //for (int i = mmm; i < listp.Count; i++)
+            //{
+            //    chart1.Series[0].Points.AddXY(Convert.ToDouble(listp[i].mOADate), Convert.ToDouble(listp[i].Value));
+            //}
         }
 
         private void chart1_MouseMove(object sender, MouseEventArgs e)
@@ -287,6 +323,38 @@ namespace OpcUaTest
             {
 
             }
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            List<point_XY> list_show = listp;
+            double[] XAxis,YAxis;
+
+            int mmm = 0;
+            int length = list_show.Count;
+            if (length - 1000 > 0)
+            {
+                mmm = length - 1000;
+                XAxis = new double[1000];
+                YAxis = new double[1000];
+                for (int i = mmm; i < 1000 + mmm; i++)
+                {
+                    XAxis[i - mmm] = list_show[i].mOADate;
+                    YAxis[i - mmm] = list_show[i].Value;
+                }
+            }
+            else
+            {
+                XAxis = new double[length];
+                YAxis = new double[length];
+                for (int i = mmm; i < length; i++)
+                {
+                    XAxis[i - mmm] = list_show[i].mOADate;
+                    YAxis[i - mmm] = list_show[i].Value;
+                }
+            }
+            
+            chart1.Series[0].Points.DataBindXY(XAxis, YAxis);
         }
     }
 }
